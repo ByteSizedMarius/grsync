@@ -13,6 +13,7 @@ import (
 type Rsync struct {
 	Source      string
 	Destination string
+	CreateDir   bool
 
 	cmd *exec.Cmd
 }
@@ -145,9 +146,9 @@ type RsyncOptions struct {
 	PruneEmptyDirs bool
 	// NumericIDs don't map uid/gid values by user/group name
 	NumericIDs bool
-	// Timeout timeout=SECONDS set I/O timeout in seconds
+	// Timeout: timeout=SECONDS set I/O timeout in seconds
 	Timeout int
-	// Contimeout contimeout=SECONDS set daemon connection timeout in seconds
+	// Contimeout: contimeout=SECONDS set daemon connection timeout in seconds
 	Contimeout int
 	// IgnoreTimes don't skip files that match size and time
 	IgnoreTimes bool
@@ -215,9 +216,9 @@ func (r Rsync) StderrPipe() (io.ReadCloser, error) {
 	return r.cmd.StderrPipe()
 }
 
-// Start starts an rsync command
+// Start starts a rsync command
 func (r Rsync) Start() error {
-	if !isExist(r.Destination) {
+	if !isExist(r.Destination) && r.CreateDir {
 		if err := createDir(r.Destination); err != nil {
 			return err
 		}
@@ -241,7 +242,10 @@ func (r Rsync) Run() error {
 }
 
 // NewRsync returns task with described options
-func NewRsync(source, destination string, options RsyncOptions) *Rsync {
+// If useSSHpass is true, then the password will be read from the options.PasswordFile file
+// and passed to the rsync command using sshpass. sshpass needs to be available.
+// If createDir is set to true, the destination will be created if it does not exist.
+func NewRsync(source, destination string, useSshPass, createDir bool, options RsyncOptions) *Rsync {
 	arguments := append(getArguments(options), source, destination)
 
 	binaryPath := "rsync"
@@ -249,15 +253,43 @@ func NewRsync(source, destination string, options RsyncOptions) *Rsync {
 		binaryPath = options.RsyncBinaryPath
 	}
 
+	if useSshPass {
+		cmd := exec.Command("/usr/bin/cat", options.PasswordFile)
+		out, err := cmd.Output()
+		if err != nil {
+			return nil
+		}
+
+		var newArgs []string
+		newArgs = []string{
+			"-p",
+			fmt.Sprintf("%s", strings.TrimSpace(string(out))),
+			binaryPath,
+		}
+		binaryPath = "/usr/bin/sshpass"
+
+		var skip bool
+		for _, arg := range arguments {
+			if arg != "--password-file" && !skip {
+				newArgs = append(newArgs, arg)
+			} else {
+				skip = !skip
+			}
+		}
+
+		arguments = newArgs
+	}
+
 	return &Rsync{
 		Source:      source,
 		Destination: destination,
+		CreateDir:   createDir,
 		cmd:         exec.Command(binaryPath, arguments...),
 	}
 }
 
 func getArguments(options RsyncOptions) []string {
-	arguments := []string{}
+	var arguments []string
 
 	if options.RsyncPath != "" {
 		arguments = append(arguments, "--rsync-path", options.RsyncPath)

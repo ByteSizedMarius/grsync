@@ -22,6 +22,10 @@ func (m matcher) Extract(data string) string {
 	return matches[0][1]
 }
 
+func (m matcher) All(data string) []string {
+	return m.regExp.FindAllString(data, -1)
+}
+
 func (m matcher) ExtractAllStringSubmatch(data string, submatchCount int) [][]string {
 	return m.regExp.FindAllStringSubmatch(data, submatchCount)
 }

@@ -2,8 +2,8 @@ package grsync
 
 import (
 	"bufio"
+	"bytes"
 	"io"
-	"math"
 	"strconv"
 	"strings"
 	"sync"
@@ -20,10 +20,10 @@ type Task struct {
 
 // State contains information about rsync process
 type State struct {
-	Remain   int     `json:"remain"`
-	Total    int     `json:"total"`
-	Speed    string  `json:"speed"`
-	Progress float64 `json:"progress"`
+	TimeRemaining   string `json:"remain"`   // Time Remaining (hh:mm:ss)
+	DownloadedTotal string `json:"total"`    // Amount of downloaded Data in unknown unit
+	Speed           string `json:"speed"`    // Speed of download in unknown unit
+	Progress        int    `json:"progress"` // Progress in percent (0-100)
 }
 
 // Log contains raw stderr and stdout outputs
@@ -61,7 +61,7 @@ func (t *Task) Run() error {
 
 	stdout, err := t.rsync.StdoutPipe()
 	if err != nil {
-		stderr.Close()
+		_ = stderr.Close()
 		return err
 	}
 
@@ -72,8 +72,9 @@ func (t *Task) Run() error {
 
 	if err = t.rsync.Start(); err != nil {
 		// Close pipes to unblock goroutines
-		stdout.Close()
-		stderr.Close()
+		_ = stdout.Close()
+		_ = stderr.Close()
+
 		wg.Wait()
 		return err
 	}
@@ -84,44 +85,67 @@ func (t *Task) Run() error {
 }
 
 // NewTask returns new rsync task
-func NewTask(source, destination string, rsyncOptions RsyncOptions) *Task {
+func NewTask(source, destination string, useSshPass, createDir bool, rsyncOptions RsyncOptions) *Task {
 	// Force set required options
 	rsyncOptions.HumanReadable = true
 	rsyncOptions.Partial = true
 	rsyncOptions.Progress = true
-	rsyncOptions.Archive = true
 
 	return &Task{
-		rsync: NewRsync(source, destination, rsyncOptions),
+		rsync: NewRsync(source, destination, useSshPass, createDir, rsyncOptions),
 		state: &State{},
 		log:   &Log{},
 	}
 }
 
-func processStdout(wg *sync.WaitGroup, task *Task, stdout io.Reader) {
-	const maxPercents = float64(100)
-	const minDivider = 1
+func scanLines(data []byte, atEOF bool) (advance int, token []byte, err error) {
+	if atEOF && len(data) == 0 {
+		return 0, nil, nil
+	}
+	if i := bytes.IndexAny(data, "\r\n"); i >= 0 {
+		if data[i] == '\n' {
+			// We have a line terminated by single newline.
+			return i + 1, data[0:i], nil
+		}
+		advance = i + 1
+		if len(data) > i+1 && data[i+1] == '\n' {
+			advance += 1
+		}
+		return advance, data[0:i], nil
+	}
+	if atEOF {
+		return len(data), data, nil
+	}
+	return 0, nil, nil
+}
 
+func processStdout(wg *sync.WaitGroup, task *Task, stdout io.Reader) {
 	defer wg.Done()
 
-	progressMatcher := newMatcher(`\(.+-chk=(\d+.\d+)`)
+	progressMatcher := newMatcher(`(\d+%)`)
 	speedMatcher := newMatcher(`(\d+\.\d+.{2}\/s)`)
+	totalMatcher := newMatcher(`^\s*(\d+.\d+[A-Za-z]*)`)
+	timeRemainingMatcher := newMatcher(`(\d+:){2}\d+`)
 
 	// Extract data from strings:
-	//         999,999 99%  999.99kB/s    0:00:59 (xfr#9, to-chk=999/9999)
-	reader := bufio.NewReader(stdout)
-	for {
-		logStr, err := reader.ReadString('\n')
-		if err != nil {
-			break
+	// 15.17G  10%   92.23MB/s    0:23:54
+	scanner := bufio.NewScanner(stdout)
+	scanner.Split(scanLines)
+	for scanner.Scan() {
+		logStr := scanner.Text()
+		task.mutex.Lock()
+
+		if totalMatcher.Match(logStr) {
+			task.state.DownloadedTotal = totalMatcher.Extract(logStr)
 		}
 
-		task.mutex.Lock()
 		if progressMatcher.Match(logStr) {
-			task.state.Remain, task.state.Total = getTaskProgress(progressMatcher.Extract(logStr))
+			tt := progressMatcher.Extract(logStr)
+			task.state.Progress, _ = strconv.Atoi(strings.TrimRight(tt, "%"))
+		}
 
-			copiedCount := float64(task.state.Total - task.state.Remain)
-			task.state.Progress = copiedCount / math.Max(float64(task.state.Total), float64(minDivider)) * maxPercents
+		if timeRemainingMatcher.Match(logStr) {
+			task.state.TimeRemaining = timeRemainingMatcher.All(logStr)[0]
 		}
 
 		if speedMatcher.Match(logStr) {
@@ -169,9 +193,8 @@ func getTaskProgress(remTotalString string) (int, int) {
 }
 
 func getTaskSpeed(data [][]string) string {
-	if len(data) < 2 || len(data[1]) < 2 {
+	if len(data) < 1 || len(data[0]) < 2 {
 		return ""
 	}
-
-	return data[1][1]
+	return data[0][0]
 }

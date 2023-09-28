@@ -11,7 +11,7 @@ import (
 
 func TestTask(t *testing.T) {
 	t.Run("create new empty Task", func(t *testing.T) {
-		createdTask := NewTask("a", "b", RsyncOptions{})
+		createdTask := NewTask("a", "b", false, false, RsyncOptions{})
 
 		assert.Empty(t, createdTask.Log(), "Task log should return empty string")
 		assert.Empty(t, createdTask.State(), "Task should inited with empty state")
@@ -57,7 +57,7 @@ func TestRunTaskSuccess(t *testing.T) {
 	f, e := os.Create(a)
 	assert.Nil(t, e)
 	f.Truncate(16 * 1024 * 1024)
-	createdTask := NewTask(a, b, RsyncOptions{})
+	createdTask := NewTask(a, b, false, false, RsyncOptions{})
 	e = createdTask.Run()
 	assert.Nil(t, e)
 	_, e = os.Stat(b)
@@ -78,7 +78,7 @@ func TestRunTaskSuccessProgress(t *testing.T) {
 	f, e := os.Create(a)
 	assert.Nil(t, e)
 	f.Truncate(16 * 1024 * 1024)
-	createdTask := NewTask(a, b, RsyncOptions{})
+	createdTask := NewTask(a, b, false, false, RsyncOptions{})
 	go func() {
 		for {
 			_ = createdTask.State()
@@ -106,7 +106,7 @@ func TestRunTaskSuccessLog(t *testing.T) {
 	f, e := os.Create(a)
 	assert.Nil(t, e)
 	f.Truncate(16 * 1024 * 1024)
-	createdTask := NewTask(a, b, RsyncOptions{})
+	createdTask := NewTask(a, b, false, false, RsyncOptions{})
 	go func() {
 		for {
 			_ = createdTask.Log()
@@ -134,7 +134,7 @@ func TestRunTaskFailure(t *testing.T) {
 	f, e := os.Create(a)
 	assert.Nil(t, e)
 	f.Truncate(16 * 1024 * 1024)
-	createdTask := NewTask(a, b, RsyncOptions{})
+	createdTask := NewTask(a, b, false, false, RsyncOptions{})
 	e = createdTask.Run()
 	assert.NotNil(t, e)
 	_, e = os.Stat(b)
