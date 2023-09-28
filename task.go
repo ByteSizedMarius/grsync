@@ -3,7 +3,9 @@ package grsync
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"io"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -52,6 +54,24 @@ func (t *Task) Log() Log {
 	return l
 }
 
+// GetFileList is a helper function that returns a partially parsed list of files if RsyncOptions.ListOnly is true.
+// The Information is returned as a slice of slices of strings in the following format:
+// Index	Value
+// 0		Permissions
+// 1		Size in Bytes
+// 2		Date
+// 3		Time
+// 4		Name
+func (t *Task) GetFileList() (files [][]string) {
+	r := regexp.MustCompile(`([rwx-]{10}) (\d+) ((?:\d+/){2}\d+) ((?:\d+:){2}\d+) (.*)`)
+	for _, l := range strings.Split(t.Log().Stdout, "\n") {
+		if r.MatchString(l) {
+			files = append(files, r.FindStringSubmatch(l)[1:])
+		}
+	}
+	return
+}
+
 // Run starts rsync process with options
 func (t *Task) Run() error {
 	stderr, err := t.rsync.StderrPipe()
@@ -64,6 +84,8 @@ func (t *Task) Run() error {
 		_ = stderr.Close()
 		return err
 	}
+
+	fmt.Println(t.rsync.cmd)
 
 	var wg sync.WaitGroup
 	go processStdout(&wg, t, stdout)

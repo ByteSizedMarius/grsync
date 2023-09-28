@@ -194,6 +194,8 @@ type RsyncOptions struct {
 	Filter string
 	// Chown --chown="", chown on receipt.
 	Chown string
+	// ListOnly --list-only, list the files instead of copying them.
+	ListOnly bool
 
 	// ipv4
 	IPv4 bool
@@ -645,6 +647,10 @@ func getArguments(options RsyncOptions) []string {
 
 	if options.Chown != "" {
 		arguments = append(arguments, fmt.Sprintf("--chown=%s", options.Chown))
+	}
+
+	if options.ListOnly {
+		arguments = append(arguments, "--list-only")
 	}
 
 	return arguments

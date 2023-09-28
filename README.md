@@ -11,6 +11,7 @@ Tested with `rsync version 3.2.3  protocol version 31`
   regex would be nice)
 - Allow disabling the creation of directory if remote target is used (
   see [#7](https://github.com/zloylos/grsync/issues/7))
+- Rsync: Added ListOnly-Param (see examples)
 - Updated deps
 
 ----
@@ -85,4 +86,43 @@ progress: 0 % / rem. 0:22:18 / tot. 1.49G / sp. 108.85MB/s
 progress: 1 % / rem. 0:22:16 / tot. 2.06G / sp. 108.58MB/s 
 progress: 1 % / rem. 0:22:16 / tot. 2.63G / sp. 108.19MB/s 
 progress: 2 % / rem. 0:22:10 / tot. 3.20G / sp. 108.21MB/s 
+```
+
+**File list:**
+
+```golang
+package main
+
+import (
+	"fmt"
+	"github.com/ByteSizedMarius/grsync"
+)
+
+func main() {
+
+	task := grsync.NewTask(
+		"/local/source",
+		"remote@target::destination",
+		true,
+		false,
+		grsync.RsyncOptions{
+			HumanReadable:   true,
+			ListOnly:        true,
+			Rsh:             "ssh -T -c aes128-ctr -o Compression=no -x",
+			PasswordFile:    "/root/pass",
+			RsyncBinaryPath: "/usr/bin/rsync",
+		},
+	)
+
+	if err := task.Run(); err != nil {
+		panic(err)
+	}
+
+	for _, file := range task.GetFileList() {
+		fmt.Printf("Permissions: %s, Size: %s, Date: %s, Time: %s, Name: %s\n", file[0], file[1], file[2], file[3], file[4])
+	}
+
+	fmt.Println("done")
+}
+
 ```
