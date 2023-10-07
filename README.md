@@ -101,7 +101,7 @@ import (
 func main() {
 
 	task := grsync.NewTask(
-		"/local/source",
+		"/local/source", // needs to be valid
 		"remote@target::destination",
 		true,
 		false,

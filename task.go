@@ -3,7 +3,6 @@ package grsync
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"io"
 	"regexp"
 	"strconv"
@@ -84,8 +83,6 @@ func (t *Task) Run() error {
 		_ = stderr.Close()
 		return err
 	}
-
-	fmt.Println(t.rsync.cmd)
 
 	var wg sync.WaitGroup
 	go processStdout(&wg, t, stdout)
