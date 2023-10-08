@@ -101,8 +101,8 @@ import (
 func main() {
 
 	task := grsync.NewTask(
-		"/local/source", // needs to be valid
-		"remote@target::destination",
+		"remote@target::destination", // directory to list the files of
+		"",
 		true,
 		false,
 		grsync.RsyncOptions{
@@ -124,5 +124,13 @@ func main() {
 
 	fmt.Println("done")
 }
+```
 
+Output:
+
+```
+Permissions: drwxrwxrwx, Size: 56, Date: 2023/10/07, Time: 13:19:08, Name: .
+Permissions: -rwxrwxrwx, Size: 402.65G, Date: 2023/10/08, Time: 00:32:49, Name: File1
+Permissions: -rwxrwxrwx, Size: 150.66G, Date: 2023/09/27, Time: 20:53:59, Name: File2
+Permissions: drwxrwxrwx, Size: 68, Date: 2023/10/08, Time: 01:13:13, Name: Dir1
 ```

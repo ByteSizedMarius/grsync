@@ -62,7 +62,7 @@ func (t *Task) Log() Log {
 // 3		Time
 // 4		Name
 func (t *Task) GetFileList() (files [][]string) {
-	r := regexp.MustCompile(`([rwx-]{10}) (\d+) ((?:\d+/){2}\d+) ((?:\d+:){2}\d+) (.*)`)
+	r := regexp.MustCompile(`([drwx-]{10}) +([\d.A-Z]+) ((?:\d+/){2}\d+) ((?:\d+:){2}\d+) (.*)`)
 	for _, l := range strings.Split(t.Log().Stdout, "\n") {
 		if r.MatchString(l) {
 			files = append(files, r.FindStringSubmatch(l)[1:])
