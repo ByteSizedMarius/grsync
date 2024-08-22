@@ -104,17 +104,22 @@ func (t *Task) Run() error {
 }
 
 // NewTask returns new rsync task
-func NewTask(source, destination string, useSshPass, createDir bool, rsyncOptions RsyncOptions) *Task {
+func NewTask(source, destination string, useSshPass, createDir bool, rsyncOptions RsyncOptions) (*Task, error) {
 	// Force set required options
 	rsyncOptions.HumanReadable = true
 	rsyncOptions.Partial = true
 	rsyncOptions.Progress = true
 
+	task, err := NewRsync(source, destination, useSshPass, createDir, rsyncOptions)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Task{
-		rsync: NewRsync(source, destination, useSshPass, createDir, rsyncOptions),
+		rsync: task,
 		state: &State{},
 		log:   &Log{},
-	}
+	}, nil
 }
 
 func scanLines(data []byte, atEOF bool) (advance int, token []byte, err error) {
