@@ -247,7 +247,7 @@ func (r Rsync) Run() error {
 // If useSSHpass is true, then the password will be read from the options.PasswordFile file
 // and passed to the rsync command using sshpass. sshpass needs to be available.
 // If createDir is set to true, the destination will be created if it does not exist.
-func NewRsync(source, destination string, useSshPass, createDir bool, options RsyncOptions) *Rsync {
+func NewRsync(source, destination string, useSshPass, createDir bool, options RsyncOptions) (*Rsync, error) {
 	arguments := append(getArguments(options), source, destination)
 
 	binaryPath := "rsync"
@@ -259,7 +259,7 @@ func NewRsync(source, destination string, useSshPass, createDir bool, options Rs
 		cmd := exec.Command("/usr/bin/cat", options.PasswordFile)
 		out, err := cmd.Output()
 		if err != nil {
-			return nil
+			return nil, err
 		}
 
 		var newArgs []string
@@ -287,7 +287,7 @@ func NewRsync(source, destination string, useSshPass, createDir bool, options Rs
 		Destination: destination,
 		CreateDir:   createDir,
 		cmd:         exec.Command(binaryPath, arguments...),
-	}
+	}, nil
 }
 
 func getArguments(options RsyncOptions) []string {
